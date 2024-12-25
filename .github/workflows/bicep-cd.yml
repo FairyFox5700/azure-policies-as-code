@@ -1,4 +1,11 @@
-name: bicep-cd
+name: Bicep-CD
+
+vars:
+  bicepPath: ./bicep/custom-polices-with-notifications
+  location: westeurope
+  devParams: params-dev.json
+  nonprodParams: params-nonprod.json
+  prodParams: params-prod.json
 
 on:
   push:
@@ -6,63 +13,117 @@ on:
     paths:
       - '**.bicep'
   workflow_dispatch:
-  # Uncomment the following lines to enable a scheduled run
-  # schedule:
-  # - cron: "0 0 * * *" # at the end of every day
 
 jobs:
-  bicep-cd:
+  DEV-BICEP-CD:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: [dev, nonprod, prod]
-        azure_credentials: [
-          secrets.AZURE_CREDENTIALS_DEV,
-          secrets.AZURE_CREDENTIALS_NONPROD,
-          secrets.AZURE_CREDENTIALS_PROD
-        ]
-        params_file: [
-          ./bicep/custom-polices-with-notifications/params-dev.json,
-          ./bicep/custom-polices-with-notifications/params-nonprod.json,
-          ./bicep/custom-polices-with-notifications/params-prod.json
-        ]
-        deployment_name: [
-          dev-bicep-cd,
-          nonprod-bicep-cd,
-          prod-bicep-cd
-        ]
     steps:
       - uses: actions/checkout@v2
       - name: Azure Login
         uses: azure/login@v1
         with:
-          creds: ${{ matrix.azure_credentials }}
-
-      - name: Bicep CD
+          creds: ${{ secrets.AZURE_CREDENTIALS_DEV }}
+      - name: Deploy Bicep Template
         id: bicepCD
         continue-on-error: true
         uses: azure/CLI@v1
         with:
           inlineScript: |
-            az deployment sub create -n ${{ matrix.deployment_name }} \
-              -f ./bicep/custom-polices-with-notifications/main.bicep \
-              -l westeurope \
-              -p ${{ matrix.params_file }} \
+            az deployment sub create \
+              -n dev-bicep-cd \
+              -f ${{ vars.bicepPath }}/main.bicep \
+              -l ${{ vars.location }} \
+              -p ${{ vars.bicepPath }}/${{ vars.devParams }} \
               -o none
-
-      - name: Sleep for 30s
-        if: ${{ steps.bicepCD.outcome == 'failure' && steps.bicepCD.conclusion == 'success' }}
+      - name: Retry on Failure
+        if: ${{ steps.bicepCD.outcome == 'failure' }}
         uses: juliangruber/sleep-action@v1
         with:
           time: 30s
-
       - name: Bicep CD Retry
-        if: ${{ steps.bicepCD.outcome == 'failure' && steps.bicepCD.conclusion == 'success' }}
+        if: ${{ steps.bicepCD.outcome == 'failure' }}
         uses: azure/CLI@v1
         with:
           inlineScript: |
-            az deployment sub create -n ${{ matrix.deployment_name }} \
-              -f ./bicep/custom-polices-with-notifications/main.bicep \
-              -l westeurope \
-              -p ${{ matrix.params_file }} \
+            az deployment sub create \
+              -n dev-bicep-cd \
+              -f ${{ vars.bicepPath }}/main.bicep \
+              -l ${{ vars.location }} \
+              -p ${{ vars.bicepPath }}/${{ vars.devParams }} \
+              -o none
+
+  NONPROD-BICEP-CD:
+    needs: DEV-BICEP-CD
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_NONPROD }}
+      - name: Deploy Bicep Template
+        id: bicepCD
+        continue-on-error: true
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az deployment sub create \
+              -n nonprod-bicep-cd \
+              -f ${{ vars.bicepPath }}/main.bicep \
+              -l ${{ vars.location }} \
+              -p ${{ vars.bicepPath }}/${{ vars.nonprodParams }} \
+              -o none
+      - name: Retry on Failure
+        if: ${{ steps.bicepCD.outcome == 'failure' }}
+        uses: juliangruber/sleep-action@v1
+        with:
+          time: 30s
+      - name: Bicep CD Retry
+        if: ${{ steps.bicepCD.outcome == 'failure' }}
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az deployment sub create \
+              -n nonprod-bicep-cd \
+              -f ${{ vars.bicepPath }}/main.bicep \
+              -l ${{ vars.location }} \
+              -p ${{ vars.bicepPath }}/${{ vars.nonprodParams }} \
+              -o none
+
+  PROD-BICEP-CD:
+    needs: NONPROD-BICEP-CD
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+      - name: Deploy Bicep Template
+        id: bicepCD
+        continue-on-error: true
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az deployment sub create \
+              -n prod-bicep-cd \
+              -f ${{ vars.bicepPath }}/main.bicep \
+              -l ${{ vars.location }} \
+              -p ${{ vars.bicepPath }}/${{ vars.prodParams }} \
+              -o none
+      - name: Retry on Failure
+        if: ${{ steps.bicepCD.outcome == 'failure' }}
+        uses: juliangruber/sleep-action@v1
+        with:
+          time: 30s
+      - name: Bicep CD Retry
+        if: ${{ steps.bicepCD.outcome == 'failure' }}
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az deployment sub create \
+              -n prod-bicep-cd \
+              -f ${{ vars.bicepPath }}/main.bicep \
+              -l ${{ vars.location }} \
+              -p ${{ vars.bicepPath }}/${{ vars.prodParams }} \
               -o none
