@@ -31,13 +31,6 @@ jobs:
           nonprod-bicep-cd,
           prod-bicep-cd
         ]
-      exclude:
-        - environment: nonprod
-          azure_credentials: secrets.AZURE_CREDENTIALS_DEV
-        - environment: prod
-          azure_credentials: secrets.AZURE_CREDENTIALS_DEV
-        - environment: prod
-          azure_credentials: secrets.AZURE_CREDENTIALS_NONPROD
 
     steps:
       - uses: actions/checkout@v2
