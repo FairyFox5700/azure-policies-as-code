@@ -1,12 +1,5 @@
 name: Bicep-CD
 
-vars:
-  bicepPath: ./bicep/custom-polices-with-notifications
-  location: westeurope
-  devParams: params-dev.json
-  nonprodParams: params-nonprod.json
-  prodParams: params-prod.json
-
 on:
   push:
     branches: [ main ]
@@ -17,6 +10,10 @@ on:
 jobs:
   DEV-BICEP-CD:
     runs-on: ubuntu-latest
+    env:
+      BICEP_PATH: ./bicep/custom-polices-with-notifications
+      LOCATION: westeurope
+      DEV_PARAMS: params-dev.json
     steps:
       - uses: actions/checkout@v2
       - name: Azure Login
@@ -31,9 +28,9 @@ jobs:
           inlineScript: |
             az deployment sub create \
               -n dev-bicep-cd \
-              -f ${{ vars.bicepPath }}/main.bicep \
-              -l ${{ vars.location }} \
-              -p ${{ vars.bicepPath }}/${{ vars.devParams }} \
+              -f ${{ env.BICEP_PATH }}/main.bicep \
+              -l ${{ env.LOCATION }} \
+              -p ${{ env.BICEP_PATH }}/${{ env.DEV_PARAMS }} \
               -o none
       - name: Retry on Failure
         if: ${{ steps.bicepCD.outcome == 'failure' }}
@@ -47,14 +44,18 @@ jobs:
           inlineScript: |
             az deployment sub create \
               -n dev-bicep-cd \
-              -f ${{ vars.bicepPath }}/main.bicep \
-              -l ${{ vars.location }} \
-              -p ${{ vars.bicepPath }}/${{ vars.devParams }} \
+              -f ${{ env.BICEP_PATH }}/main.bicep \
+              -l ${{ env.LOCATION }} \
+              -p ${{ env.BICEP_PATH }}/${{ env.DEV_PARAMS }} \
               -o none
 
   NONPROD-BICEP-CD:
     needs: DEV-BICEP-CD
     runs-on: ubuntu-latest
+    env:
+      BICEP_PATH: ./bicep/custom-polices-with-notifications
+      LOCATION: westeurope
+      NONPROD_PARAMS: params-nonprod.json
     steps:
       - uses: actions/checkout@v2
       - name: Azure Login
@@ -69,9 +70,9 @@ jobs:
           inlineScript: |
             az deployment sub create \
               -n nonprod-bicep-cd \
-              -f ${{ vars.bicepPath }}/main.bicep \
-              -l ${{ vars.location }} \
-              -p ${{ vars.bicepPath }}/${{ vars.nonprodParams }} \
+              -f ${{ env.BICEP_PATH }}/main.bicep \
+              -l ${{ env.LOCATION }} \
+              -p ${{ env.BICEP_PATH }}/${{ env.NONPROD_PARAMS }} \
               -o none
       - name: Retry on Failure
         if: ${{ steps.bicepCD.outcome == 'failure' }}
@@ -85,14 +86,18 @@ jobs:
           inlineScript: |
             az deployment sub create \
               -n nonprod-bicep-cd \
-              -f ${{ vars.bicepPath }}/main.bicep \
-              -l ${{ vars.location }} \
-              -p ${{ vars.bicepPath }}/${{ vars.nonprodParams }} \
+              -f ${{ env.BICEP_PATH }}/main.bicep \
+              -l ${{ env.LOCATION }} \
+              -p ${{ env.BICEP_PATH }}/${{ env.NONPROD_PARAMS }} \
               -o none
 
   PROD-BICEP-CD:
     needs: NONPROD-BICEP-CD
     runs-on: ubuntu-latest
+    env:
+      BICEP_PATH: ./bicep/custom-polices-with-notifications
+      LOCATION: westeurope
+      PROD_PARAMS: params-prod.json
     steps:
       - uses: actions/checkout@v2
       - name: Azure Login
@@ -107,9 +112,9 @@ jobs:
           inlineScript: |
             az deployment sub create \
               -n prod-bicep-cd \
-              -f ${{ vars.bicepPath }}/main.bicep \
-              -l ${{ vars.location }} \
-              -p ${{ vars.bicepPath }}/${{ vars.prodParams }} \
+              -f ${{ env.BICEP_PATH }}/main.bicep \
+              -l ${{ env.LOCATION }} \
+              -p ${{ env.BICEP_PATH }}/${{ env.PROD_PARAMS }} \
               -o none
       - name: Retry on Failure
         if: ${{ steps.bicepCD.outcome == 'failure' }}
@@ -123,7 +128,7 @@ jobs:
           inlineScript: |
             az deployment sub create \
               -n prod-bicep-cd \
-              -f ${{ vars.bicepPath }}/main.bicep \
-              -l ${{ vars.location }} \
-              -p ${{ vars.bicepPath }}/${{ vars.prodParams }} \
+              -f ${{ env.BICEP_PATH }}/main.bicep \
+              -l ${{ env.LOCATION }} \
+              -p ${{ env.BICEP_PATH }}/${{ env.PROD_PARAMS }} \
               -o none
