@@ -1,0 +1,76 @@
+name: bicep-cd
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.bicep'
+  workflow_dispatch:
+  # Uncomment the following lines to enable a scheduled run
+  # schedule:
+  # - cron: "0 0 * * *" # at the end of every day
+
+jobs:
+  bicep-cd:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, nonprod, prod]
+        azure_credentials: [
+          secrets.AZURE_CREDENTIALS_DEV,
+          secrets.AZURE_CREDENTIALS_NONPROD,
+          secrets.AZURE_CREDENTIALS_PROD
+        ]
+        params_file: [
+          ./bicep/custom-polices-with-notifications/params-dev.json,
+          ./bicep/custom-polices-with-notifications/params-nonprod.json,
+          ./bicep/custom-polices-with-notifications/params-prod.json
+        ]
+        deployment_name: [
+          dev-bicep-cd,
+          nonprod-bicep-cd,
+          prod-bicep-cd
+        ]
+      exclude:
+        - environment: nonprod
+          azure_credentials: secrets.AZURE_CREDENTIALS_DEV
+        - environment: prod
+          azure_credentials: secrets.AZURE_CREDENTIALS_DEV
+        - environment: prod
+          azure_credentials: secrets.AZURE_CREDENTIALS_NONPROD
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ matrix.azure_credentials }}
+
+      - name: Bicep CD
+        id: bicepCD
+        continue-on-error: true
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az deployment sub create -n ${{ matrix.deployment_name }} \
+              -f ./bicep/custom-polices-with-notifications/main.bicep \
+              -l westeurope \
+              -p ${{ matrix.params_file }} \
+              -o none
+
+      - name: Sleep for 30s
+        if: ${{ steps.bicepCD.outcome == 'failure' && steps.bicepCD.conclusion == 'success' }}
+        uses: juliangruber/sleep-action@v1
+        with:
+          time: 30s
+
+      - name: Bicep CD Retry
+        if: ${{ steps.bicepCD.outcome == 'failure' && steps.bicepCD.conclusion == 'success' }}
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az deployment sub create -n ${{ matrix.deployment_name }} \
+              -f ./bicep/custom-polices-with-notifications/main.bicep \
+              -l westeurope \
+              -p ${{ matrix.params_file }} \
+              -o none
